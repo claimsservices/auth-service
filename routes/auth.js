@@ -117,46 +117,65 @@ router.get('/profile', (req, res) => {
 // Update password
 router.post('/update-password', async (req, res) => {
     const { username, oldPassword, newPassword } = req.body;
-    if (!validator.isAlphanumeric(username)) {
-        return res.status(400).json({ message: 'Username must be alphanumeric.' });
+    const token = req.headers['authorization'];
+
+    if (!token) {
+        return res.status(401).json({ message: 'No token provided.' });
     }
 
-    if (!username || !oldPassword || !newPassword) {
-        return res.status(400).json({ message: 'Username, old password, and new password are required.' });
-    }
-
-    // Check if the user exists
-    const query = 'SELECT * FROM users WHERE username = ?';
-    db.query(query, [username], async (err, results) => {
+    // Verifying JWT token
+    jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
         if (err) {
-            return res.status(500).json({ message: 'Error checking user existence.', error: err });
+            return res.status(401).json({ message: 'Invalid token.' });
         }
 
-        if (results.length === 0) {
-            return res.status(404).json({ message: 'User not found.' });
+        // Proceed with password update after verifying token
+        if (!validator.isAlphanumeric(username)) {
+            return res.status(400).json({ message: 'Username must be alphanumeric.' });
         }
 
-        const user = results[0];
-
-        // Check if the old password matches
-        const isPasswordValid = await bcrypt.compare(oldPassword, user.password);
-        if (!isPasswordValid) {
-            return res.status(401).json({ message: 'Incorrect old password.' });
+        if (oldPassword === newPassword) {
+            return res.status(400).json({ message: 'Old password must not be the same as the new password.' });
         }
 
-        // Hash the new password
-        const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+        if (!username || !oldPassword || !newPassword) {
+            return res.status(400).json({ message: 'Username, old password, and new password are required.' });
+        }
 
-        // Update the password in the database
-        const updateQuery = 'UPDATE users SET password = ? WHERE username = ?';
-        db.query(updateQuery, [hashedNewPassword, username], (err) => {
+        // Check if the user exists
+        const query = 'SELECT * FROM users WHERE username = ?';
+        db.query(query, [username], async (err, results) => {
             if (err) {
-                return res.status(500).json({ message: 'Error updating password.', error: err });
+                return res.status(500).json({ message: 'Error checking user existence.', error: err });
             }
 
-            res.status(200).json({ message: 'Password updated successfully.' });
+            if (results.length === 0) {
+                return res.status(404).json({ message: 'User not found.' });
+            }
+
+            const user = results[0];
+
+            // Check if the old password matches
+            const isPasswordValid = await bcrypt.compare(oldPassword, user.password);
+            if (!isPasswordValid) {
+                return res.status(401).json({ message: 'Incorrect old password.' });
+            }
+
+            // Hash the new password
+            const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+
+            // Update the password in the database
+            const updateQuery = 'UPDATE users SET password = ? WHERE username = ?';
+            db.query(updateQuery, [hashedNewPassword, username], (err) => {
+                if (err) {
+                    return res.status(500).json({ message: 'Error updating password.', error: err });
+                }
+
+                return res.status(200).json({ message: 'Password updated successfully.' }); // Use return to prevent further code execution
+            });
         });
     });
 });
+
 
 module.exports = router;
