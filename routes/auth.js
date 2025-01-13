@@ -1,9 +1,17 @@
 const express = require('express');
+const cors = require('cors'); // Import the cors module
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('../db');
 const router = express.Router();
 const validator = require('validator');
+
+// Enable CORS globally for all routes
+router.use(cors({
+    origin: 'http://192.168.1.120:3000', // Allow requests from your frontend origin
+    methods: ['GET', 'POST', 'PUT', 'DELETE'], // Allow specific HTTP methods
+    allowedHeaders: ['Content-Type', 'Authorization'], // Allow specific headers
+}));
 
 // Register
 router.post('/register', async (req, res) => {
@@ -28,7 +36,7 @@ router.post('/register', async (req, res) => {
             INSERT INTO users (username, email, password, first_name, last_name, phone)
             VALUES (?, ?, ?, ?, ?, ?)
         `;
-        
+
         db.query(query, [username, email, hashedPassword, first_name, last_name, phone], (err) => {
             if (err) {
                 if (err.code === 'ER_DUP_ENTRY') {
@@ -36,18 +44,17 @@ router.post('/register', async (req, res) => {
                         error: {
                             message: 'Username or email already exists.',
                             code: 'DUPLICATE_USERNAME_OR_EMAIL',
-                            details: `The username or email "${username}" is already in use.`
-                        }
+                            details: `The username or email "${username}" is already in use.`,
+                        },
                     });
                 }
 
-                // Return a generic error with an object structure
                 return res.status(500).json({
                     error: {
                         message: 'Error registering user.',
                         code: 'SERVER_ERROR',
-                        details: err.message || 'Unknown error occurred while registering user.'
-                    }
+                        details: err.message || 'Unknown error occurred while registering user.',
+                    },
                 });
             }
 
@@ -115,7 +122,6 @@ router.post('/update-password', async (req, res) => {
         return res.status(401).json({ message: 'No token provided.' });
     }
 
-    // Verifying JWT token
     jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
         if (err) {
             return res.status(401).json({ message: 'Invalid token.' });
@@ -129,7 +135,6 @@ router.post('/update-password', async (req, res) => {
             return res.status(400).json({ message: 'Username, old password, and new password are required.' });
         }
 
-        // Check if the user exists
         const query = 'SELECT * FROM users WHERE username = ?';
         db.query(query, [username], async (err, results) => {
             if (err) {
@@ -141,28 +146,22 @@ router.post('/update-password', async (req, res) => {
             }
 
             const user = results[0];
-
-            // Check if the old password matches
             const isPasswordValid = await bcrypt.compare(oldPassword, user.password);
             if (!isPasswordValid) {
                 return res.status(401).json({ message: 'Incorrect old password.' });
             }
 
-            // Hash the new password
             const hashedNewPassword = await bcrypt.hash(newPassword, 10);
-
-            // Update the password in the database
             const updateQuery = 'UPDATE users SET password = ? WHERE username = ?';
             db.query(updateQuery, [hashedNewPassword, username], (err) => {
                 if (err) {
                     return res.status(500).json({ message: 'Error updating password.', error: err });
                 }
 
-                return res.status(200).json({ message: 'Password updated successfully.' }); // Use return to prevent further code execution
+                return res.status(200).json({ message: 'Password updated successfully.' });
             });
         });
     });
 });
-
 
 module.exports = router;
