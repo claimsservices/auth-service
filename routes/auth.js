@@ -14,11 +14,6 @@ router.post('/register', async (req, res) => {
         return res.status(400).json({ message: 'Username, email, and password are required.' });
     }
 
-    // Validate username: alphanumeric
-    if (!validator.isAlphanumeric(username)) {
-        return res.status(400).json({ message: 'Username must be alphanumeric.' });
-    }
-
     // Validate email format
     if (!validator.isEmail(email)) {
         return res.status(400).json({ message: 'Invalid email format.' });
@@ -67,9 +62,6 @@ router.post('/register', async (req, res) => {
 // Login
 router.post('/login', (req, res) => {
     const { username, password } = req.body;
-    if (!validator.isAlphanumeric(username)) {
-        return res.status(400).json({ message: 'Username must be alphanumeric.' });
-    }
 
     if (!username || !password) {
         return res.status(400).json({ message: 'Username and password are required.' });
@@ -127,11 +119,6 @@ router.post('/update-password', async (req, res) => {
     jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
         if (err) {
             return res.status(401).json({ message: 'Invalid token.' });
-        }
-
-        // Proceed with password update after verifying token
-        if (!validator.isAlphanumeric(username)) {
-            return res.status(400).json({ message: 'Username must be alphanumeric.' });
         }
 
         if (oldPassword === newPassword) {
